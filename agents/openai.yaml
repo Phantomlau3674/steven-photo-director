@@ -1,0 +1,7 @@
+interface:
+  display_name: "Steven Photo Director"
+  short_description: "Cull large photo folders without touching originals."
+  brand_color: "#1F7A8C"
+  default_prompt: "Use $steven-photo-director to inspect this photo folder, ask me whether to group scenes and what culling strength to use, then produce selected/review/reject folders."
+policy:
+  allow_implicit_invocation: true

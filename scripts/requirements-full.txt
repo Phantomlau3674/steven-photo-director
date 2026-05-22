@@ -1,0 +1,3 @@
+-r requirements-plus.txt
+mediapipe>=0.10
+pyiqa>=0.1

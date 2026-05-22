@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+dist/
+tmp/
+*_cull/
+photo_cull_output/
+face_final_review/
+face_final/

@@ -1,0 +1,6 @@
+-r requirements.txt
+pillow-heif>=0.16
+rawpy>=0.19
+opencv-python-headless>=4.8
+imagehash>=4.3
+scikit-image>=0.22
