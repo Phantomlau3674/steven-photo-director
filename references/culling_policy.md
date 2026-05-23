@@ -7,6 +7,7 @@
 - Never overwrite originals.
 - Prefer sidecars, reports, and copied selections.
 - Keep machine decisions separate from final editorial decisions.
+- Treat scene meaning and scene priority as model/editor decisions. Script grouping only creates comparison surfaces.
 
 ## First-Pass Labels
 
@@ -40,6 +41,17 @@ Final decisions must be one of:
 - `near_duplicate`: perceptually similar to another image.
 
 For selected people photos, risk flags are not enough. A face can be technically clean but still unflattering, stiff, or mistimed. Treat `requires_face_final_review=true` as a required editorial gate, not as another score penalty.
+
+## Scene Policy
+
+Scene grouping scripts may cluster similar photos and make contact sheets, but they do not understand which moment matters to the user. Before final selection, the agent/model must inspect grouped photos and decide:
+
+- what each scene represents
+- whether the scene belongs in the final set
+- how many photos the scene deserves
+- which frame best carries the scene
+
+Use model/user-reviewed `group_choices.csv` as guidance. Do not treat script group IDs, representative images, or group scores as final scene choices.
 
 ## Reject Policy
 

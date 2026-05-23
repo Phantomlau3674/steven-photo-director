@@ -16,7 +16,15 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Set
 
-from export_selection import copy_rows, materialize_file, unique_destination, write_list
+from export_selection import (
+    HUMAN_RESULT_DIR,
+    PROCESS_DIR,
+    copy_rows,
+    materialize_file,
+    unique_destination,
+    write_list,
+    write_open_here,
+)
 from scan_photos import build_sheet
 
 
@@ -24,7 +32,7 @@ FACE_REVIEW_FLAGS = {"face_eye_review", "eye_closed_review", "eye_asymmetry_revi
 
 
 def load_json(path: Path) -> Dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def normalize_action(value: str) -> str:
@@ -181,9 +189,9 @@ def build_review_pack(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest).expanduser().resolve()
     output_dir = Path(args.output).expanduser().resolve() if args.output else selection_path.parent / "face_final_review"
     output_dir.mkdir(parents=True, exist_ok=True)
-    sheets_dir = output_dir / "comparison_sheets"
+    sheets_dir = output_dir / "01_对比图"
     sheets_dir.mkdir(parents=True, exist_ok=True)
-    review_sets_dir = output_dir / "face_review_sets"
+    review_sets_dir = output_dir / "02_逐张对比_当前与候选"
     review_sets_dir.mkdir(parents=True, exist_ok=True)
 
     selection = load_json(selection_path)
@@ -274,8 +282,8 @@ def build_review_pack(args: argparse.Namespace) -> int:
             }
         )
 
-    build_sheet(overview_items, output_dir / "face_keep_overview.jpg", "Current KEEP face/portrait review", columns=args.columns)
-    choices_path = output_dir / "face_review_choices.csv"
+    build_sheet(overview_items, output_dir / "00_当前精选总览.jpg", "Current KEEP face/portrait review", columns=args.columns)
+    choices_path = output_dir / "03_人工调整表_face_review_choices.csv"
     fieldnames = [
         "keep_relative_path",
         "action",
@@ -307,10 +315,10 @@ def build_review_pack(args: argparse.Namespace) -> int:
             [
                 "# Face Final Review",
                 "",
-                "Open `face_keep_overview.jpg` and `comparison_sheets/`.",
-                "You can also browse `face_review_sets/`: each selected photo has `current_keep/` and `alternatives/` folders.",
+                "Open `00_当前精选总览.jpg` and `01_对比图/`.",
+                "You can also browse `02_逐张对比_当前与候选/`: each selected photo has `current_keep/` and `alternatives/` folders.",
                 "",
-                "Edit `face_review_choices.csv`:",
+                "Edit `03_人工调整表_face_review_choices.csv`:",
                 "",
                 "- `keep`: keep current selected photo.",
                 "- `replace`: set `replacement_relative_path` to one candidate from the row.",
@@ -332,7 +340,7 @@ def build_review_pack(args: argparse.Namespace) -> int:
         "review_scope": args.review_scope,
         "scope_reason": scope_reason,
         "choices_csv": str(choices_path),
-        "overview": str(output_dir / "face_keep_overview.jpg"),
+        "overview": str(output_dir / "00_当前精选总览.jpg"),
         "comparison_sheets": str(sheets_dir),
         "review_sets": str(review_sets_dir),
         "review_sets_csv": str(output_dir / "face_review_sets.csv"),
@@ -378,6 +386,8 @@ def apply_review_choices(args: argparse.Namespace) -> int:
     choices_path = Path(args.choices_csv).expanduser().resolve()
     output_dir = Path(args.output).expanduser().resolve() if args.output else selection_path.parent / "face_final_applied"
     output_dir.mkdir(parents=True, exist_ok=True)
+    process_dir = output_dir / PROCESS_DIR
+    process_dir.mkdir(parents=True, exist_ok=True)
 
     selection = load_json(selection_path)
     manifest = load_json(manifest_path)
@@ -428,32 +438,63 @@ def apply_review_choices(args: argparse.Namespace) -> int:
                 applied.append({"action": action, "current": current_path, "status": "unknown_action"})
 
     unresolved = [row for row in applied if row.get("status") not in {"applied"}]
-    final_selection = output_dir / "selection_face_final.json"
+    final_selection = process_dir / "selection_face_final.json"
     selection["selection_notes"] = (selection.get("selection_notes") or "") + " Face final review choices applied."
     selection["face_final_review_applied"] = True
     selection["face_final_review_choices"] = str(choices_path)
     selection["face_final_review_status"] = "applied_with_warnings" if unresolved else "applied"
     selection["requires_face_final_review"] = bool(unresolved)
+    requires_model_scene_review = bool(selection.get("requires_model_scene_review", False))
+    if not requires_model_scene_review and selection.get("review_status") in {None, "", "machine_triage_only_requires_model_scene_review"}:
+        selection["review_status"] = "model_scene_reviewed_final"
     final_selection.write_text(json.dumps(selection, ensure_ascii=False, indent=2), encoding="utf-8")
 
     rows = selection.get("selections", [])
     by_decision = {decision: [item for item in rows if item.get("decision") == decision] for decision in ("KEEP", "REVIEW", "REJECT")}
-    write_list(output_dir / "selection_keep.txt", by_decision["KEEP"])
-    write_list(output_dir / "selection_review.txt", by_decision["REVIEW"])
-    write_list(output_dir / "selection_reject.txt", by_decision["REJECT"])
-    copied = copy_rows(rows, output_dir / "folders", "zh", args.file_mode)
+    write_list(process_dir / "selection_keep.txt", by_decision["KEEP"])
+    write_list(process_dir / "selection_review.txt", by_decision["REVIEW"])
+    write_list(process_dir / "selection_reject.txt", by_decision["REJECT"])
+    result_dir = output_dir / HUMAN_RESULT_DIR
+    copied = copy_rows(rows, result_dir, "zh", args.file_mode)
     summary = {
         "output_dir": str(output_dir),
+        "result_dir": str(result_dir),
+        "process_dir": str(process_dir),
         "final_selection": str(final_selection),
         "counts": dict(Counter(item.get("decision") for item in rows)),
         "face_final_review_status": selection["face_final_review_status"],
         "requires_face_final_review": selection["requires_face_final_review"],
+        "requires_model_scene_review": requires_model_scene_review,
+        "review_status": selection.get("review_status"),
         "applied": applied,
         "unresolved_count": len(unresolved),
         "copied_count": len([row for row in copied if row["status"] == "copied"]),
         "hardlinked_count": len([row for row in copied if row["status"] == "hardlinked"]),
     }
-    (output_dir / "face_final_apply_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    summary_path = process_dir / "face_final_apply_summary.json"
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    if requires_model_scene_review:
+        readme_title = "Steven Photo Director 待场景终审结果"
+        readme_status = "已应用人脸/表情调整，但 selection.json 仍标记为需要模型场景审片；请先完成场景识别、场景取舍和最终精选确认。"
+        next_action = "继续让智能体/模型按场景检查 `01_最终结果`、候选对比图和场景分组；确认后再把 `requires_model_scene_review` 设为 false。"
+    else:
+        readme_title = "Steven Photo Director 最终结果"
+        readme_status = "已应用人脸/表情终审，并且 selection.json 不再要求模型场景审片。"
+        next_action = "这里已经应用人脸/表情终审结果。给用户交付时只需要打开 `01_最终结果`。"
+    summary["open_here"] = str(
+        write_open_here(
+            output_dir,
+            title=readme_title,
+            result_dir=result_dir,
+            process_dir=process_dir,
+            selection_json=final_selection,
+            summary_json=summary_path,
+            counts=summary.get("counts"),
+            status=readme_status,
+            next_action=next_action,
+        )
+    )
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 

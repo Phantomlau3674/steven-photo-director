@@ -1,85 +1,116 @@
 # Output Contract
 
-## Scanner Outputs
+This skill has two visible stages:
 
-`manifest.json`
+1. Machine candidate package: scripts clean, group, flag risk, expose duplicates, and organize candidates.
+2. Final package: agent/model or human has visually reviewed scenes and photo choices.
 
-```json
-{
-  "generated_at": "ISO-8601 timestamp",
-  "input_dir": "absolute input path",
-  "settings": {},
-  "stats": {},
-  "items": []
-}
+Do not blur these stages. A script-only run must not be described as final.
+
+## Human-Readable Roots
+
+Every visible package must include:
+
+```text
+打开这里_README.md
 ```
 
-Each item includes:
+Machine candidate package:
 
-- `path`: absolute source path
-- `relative_path`: path relative to the input folder
-- `width`, `height`, `megapixels`
-- `capture_time`
-- `camera_make`, `camera_model`, `lens_model`
-- `decoder`
-- `blur_score`
-- `brightness_mean`
-- `shadow_clip_pct`
-- `highlight_clip_pct`
-- `contrast`
-- `colorfulness`
-- `face_count`
-- `eye_count`
-- `eye_analysis_method`
-- `face_landmark_count`
-- `eye_ear_min`, `eye_ear_avg`
-- `eye_ear_left_min`, `eye_ear_right_min`
-- `eye_closed_face_count`
-- `eye_asymmetry_face_count`
-- `eye_analysis_error`
-- `dhash`
-- `duplicate_group_id`
-- `duplicate_rank`
-- `script_duplicate_pick`
-- `risk_flags`
-- `technical_score`
-- `first_pass_decision`
+```text
+01_模型审片候选/
+  精选/
+  待定/
+  废片/
+90_过程文件/
+```
 
-`manifest.csv` is the same data in spreadsheet-friendly form.
+Final package:
 
-`duplicate_groups.csv` lists only near-duplicate groups.
+```text
+01_最终结果/
+  精选/
+  待定/
+  废片/
+90_过程文件/
+```
 
-`contact_sheets/` contains JPG sheets for duplicate groups and risk review.
+`精选` under `01_模型审片候选` means candidate top picks only. It does not mean final selected photos.
+
+## Scanner Outputs
+
+`scan_photos.py` writes process files:
+
+- `manifest.json`
+- `manifest.csv`
+- `duplicate_groups.csv`
+- `contact_sheets/`
+
+These values are triage signals. They are not final aesthetic decisions.
 
 ## Grouping Outputs
 
-`group_photos.py` writes a user-browsable scene grouping layer:
+`group_photos.py` writes a provisional scene layer:
 
 - `场景分组/scene_XXXX/`: grouped original photos as copies or hardlinks.
 - `group_overview.jpg`: one representative image per group.
 - `group_contact_sheets/scene_XXXX.jpg`: visual sheet per group.
 - `groups.csv`: group metadata.
-- `group_choices.csv`: user-editable scene selection template.
-- `group_assignments.json`: path-to-group mapping for ensemble selection.
+- `group_choices.csv`: editable scene decision template.
+- `group_assignments.json`: path-to-group mapping for candidate generation.
 
-`group_choices.csv` supports:
+The agent/model must visually inspect `场景分组/`, `group_overview.jpg`, and `group_contact_sheets/` before using scene choices.
 
-- `include`: select only from included/priority groups when any include exists.
-- `priority`: boost this group while keeping other non-excluded groups eligible.
-- `exclude`: keep this group out of final selection.
-- `keep_count`: optional group-level target count.
+`group_choices.csv` fields:
 
-## Final Selection JSON
+- `include`: model/user wants this scene considered.
+- `priority`: model/user wants this scene boosted.
+- `exclude`: model/user wants this scene kept out.
+- `scene_quality`: 0-5 model/user quality judgment for the scene.
+- `scene_role`: hero / strong / support / weak / drop.
+- `evidence`: why the scene should receive more or fewer picks.
+- `memory_note`: temporary model memory to carry into merged review.
+- `keep_count`: model/user wants an approximate count for this scene.
 
-Create `selection.json` in this shape:
+Only model/user-reviewed `group_choices.csv` should affect final intent. Script grouping alone is not scene understanding.
+
+## Score-Assisted Review Boards
+
+After scene choices are set, use `build_review_boards.py` to create token-efficient visual evidence:
+
+```text
+review_boards/
+  review_board_index.md
+  scene_review_memory.csv
+  review_pool.csv
+  01_场景分数图板/
+  02_合并精审图板/
+  03_超级精选逐张清单.csv   # only in super-select mode
+```
+
+Use these boards after scene selection:
+
+- `scene_review_memory.csv`: the model's temporary memory: scene role, quality, reason, and suggested allocation.
+- `01_场景分数图板/`: score-assisted candidates inside each chosen scene.
+- `02_合并精审图板/`: merged cross-scene balance review.
+- `03_超级精选逐张清单.csv`: one-by-one original review list only when the user chose super-select mode.
+
+Scores decide board order only. The model/editor decides final photos.
+
+## Selection JSON
+
+Candidate selection JSON should include:
 
 ```json
 {
   "source_manifest": "path/to/manifest.json",
-  "selection_notes": "short summary",
+  "target_keep_count": 20,
+  "selection_brief": "brief",
+  "review_status": "machine_triage_only_requires_model_scene_review",
+  "requires_model_scene_review": true,
   "requires_face_final_review": true,
-  "face_keep_count": 12,
   "face_final_review_status": "required_before_delivery",
+  "selection_notes": "Machine triage only...",
   "selections": [
     {
       "path": "absolute/source/file.jpg",
@@ -87,9 +118,28 @@ Create `selection.json` in this shape:
       "decision": "KEEP",
       "rating": 5,
       "label": "green",
-      "reason": "Best expression and cleanest composition in duplicate group dup_0001."
+      "reason": "Candidate reason, not final aesthetic verdict."
     }
   ]
+}
+```
+
+Final reviewed selection JSON must set:
+
+```json
+{
+  "review_status": "model_scene_reviewed_final",
+  "requires_model_scene_review": false
+}
+```
+
+If face/expression tuning was applied, final JSON should also set:
+
+```json
+{
+  "face_final_review_applied": true,
+  "face_final_review_status": "applied",
+  "requires_face_final_review": false
 }
 ```
 
@@ -99,61 +149,52 @@ Allowed decisions:
 - `REVIEW`
 - `REJECT`
 
-Suggested ratings:
+## Candidate Scripts
 
-- `5`: KEEP hero or final delivery candidate
-- `4`: KEEP alternate
-- `3`: REVIEW
-- `1`: REJECT
-- `0`: hard reject or unreadable
+`select_photos.py` and `ensemble_select_photos.py` write script candidate packages.
 
-## Export Outputs
-
-`select_photos.py` is the preferred user-facing export. It writes:
+They write process files under `90_过程文件/`:
 
 - `selection.json`
 - `selection_keep.txt`
 - `selection_review.txt`
 - `selection_reject.txt`
 - `selection_summary.json`
-- copied folders:
-  - `精选/`
-  - `待定/`
-  - `废片/`
 
-Default culling style is `balanced`: severe technical failures go to `废片/`, while duplicate alternates and people-photo candidates go to `待定/`, not `废片/`. Use `--cull-style gentle` for almost no automatic waste, and `--cull-style strict` for aggressive cleanup.
-
-`ensemble_select_photos.py` writes the same user-facing folders and adds:
+`ensemble_select_photos.py` also writes:
 
 - `method_votes.csv`
 - `method_disagreements.csv`
 
-Use it when the user asks for stronger cross-checking or a more trustworthy X-photo selection.
+By default they copy/hardlink visible folders under:
 
-Both selection scripts also write these face-review gate fields into `selection.json` and `selection_summary.json`:
+```text
+01_模型审片候选/
+  精选/
+  待定/
+  废片/
+```
 
-- `face_keep_count`: number of selected KEEP rows with detected face/eye signals.
-- `people_brief_hint`: whether the user brief sounds people/portrait/social oriented.
-- `requires_face_final_review`: true when selected face rows exist or the brief asks for people-facing output.
-- `face_final_review_status`: `required_before_delivery` or `not_required_by_detected_content`.
+Both scripts must write:
 
-When `requires_face_final_review` is true, treat the copied KEEP folder as a draft until the face final review is applied or explicitly waived.
+- `requires_model_scene_review=true`
+- `review_status=machine_triage_only_requires_model_scene_review`
 
-When `ensemble_select_photos.py` receives `--group-choices`, final selection respects the user's scene choices and records `scene_group_id` in `selection.json` and `method_votes.csv`.
+Use `ensemble_select_photos.py` when the user asks for "火力全开", cross-checking, or a stronger candidate pool. Even then, it is still only candidate organization.
+
+For normal mode, the expected path is scene choices -> `ensemble_select_photos.py` -> `build_review_boards.py --mode board` -> model board review.
+
+For super-select mode, the expected path is scene choices -> `ensemble_select_photos.py` -> `build_review_boards.py --mode super` -> board review -> one-by-one shortlist review.
 
 ## Face Final Review Outputs
 
-`face_final_review.py build` writes:
+`face_final_review.py build` writes review materials inside process files:
 
-- `face_keep_overview.jpg`: current selected people/portrait candidates.
-- `comparison_sheets/`: one sheet per selected image, with current KEEP plus same-scene/same-sequence alternatives.
-- `face_review_sets/`: browsable folders with `current_keep/` and `alternatives/` for each selected image.
-- `face_review_sets.csv`: index of files materialized into the review sets.
-- `face_review_choices.csv`: editable replacement template.
-- `face_review_instructions.md`
+- `00_当前精选总览.jpg`
+- `01_对比图/`
+- `02_逐张对比_当前与候选/`
+- `03_人工调整表_face_review_choices.csv`
 - `face_review_summary.json`
-
-`--review-scope auto` reviews selected KEEP rows with face/eye signals. If face detection data is unavailable, it falls back to all KEEP rows so people-heavy sets still get a manual face pass. Use `--review-scope all` when the user wants every selected image checked, or `--review-scope faces` when only detected face rows should be included.
 
 `face_review_choices.csv` supports:
 
@@ -162,28 +203,25 @@ When `ensemble_select_photos.py` receives `--group-choices`, final selection res
 - `drop`
 - `reject`
 
-`face_final_review.py apply` writes:
+`face_final_review.py apply` writes a final package:
 
-- `selection_face_final.json`
-- final `精选/`, `待定/`, `废片/` folders
-- `face_final_apply_summary.json`
+- `打开这里_README.md`
+- `01_最终结果/精选`
+- `01_最终结果/待定`
+- `01_最终结果/废片`
+- `90_过程文件/selection_face_final.json`
+- `90_过程文件/face_final_apply_summary.json`
 
-After apply, `selection_face_final.json` sets `face_final_review_applied=true`, `face_final_review_status=applied` or `applied_with_warnings`, and clears `requires_face_final_review` unless unresolved CSV actions remain.
+## Final Export
+
+Use `export_selection.py` only after the selection JSON has been model/editor reviewed:
+
+```bash
+python scripts/export_selection.py "/path/to/reviewed_selection.json" --output "/path/to/final_delivery/90_过程文件" --copy-to "/path/to/final_delivery/01_最终结果" --file-mode hardlink
+```
+
+If `requires_model_scene_review=true`, `export_selection.py` must warn in `打开这里_README.md` that the result is still a candidate package.
 
 ## Safety Output Expectations
 
 Outputs are local and non-destructive by default. If the user asks to publish, upload, sell, or redistribute photos, check ownership/permission and privacy concerns first.
-
-`export_selection.py` writes:
-
-- `selection_keep.txt`
-- `selection_review.txt`
-- `selection_reject.txt`
-- `selection_summary.json`
-
-When called with `--copy-to`, it also creates:
-
-- `精选/`, `待定/`, `废片/` by default
-- `KEEP/`, `REVIEW/`, `REJECT/` when called with `--folder-style en`
-
-When called with `--xmp`, it writes sidecar files next to the exported lists unless `--xmp-dir` is provided.

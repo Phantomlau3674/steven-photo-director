@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a count-limited photo selection and optional 精选/待定/废片 folders."""
+"""Create a machine triage candidate pool for later model visual review."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Set, Tuple
 
-from export_selection import copy_rows, write_list
+from export_selection import DRAFT_RESULT_DIR, PROCESS_DIR, copy_rows, write_list, write_open_here
 
 
 HARD_REJECT_FLAGS = {"decode_failed", "low_resolution"}
@@ -51,7 +51,7 @@ PEOPLE_BRIEF_HINTS = {
 
 
 def load_manifest(path: Path) -> Dict[str, Any]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if "items" not in data or not isinstance(data["items"], list):
         raise SystemExit("manifest.json must contain an item list.")
     return data
@@ -213,7 +213,9 @@ def build_selection(manifest: Dict[str, Any], keep_count: int, brief: str, cull_
         "cull_style": cull_style,
         "selection_brief": brief,
         **face_status,
-        "selection_notes": "Machine draft. Agent/editor should visually review 精选 and duplicate contact sheets against the brief. Gentle mode keeps people/sequence alternates in 待定 instead of dumping them into 废片.",
+        "requires_model_scene_review": True,
+        "review_status": "machine_triage_only_requires_model_scene_review",
+        "selection_notes": "Machine triage only. Scripts may clean, group, flag risk, and build a candidate pool, but the agent/model must visually identify scenes, compare within scenes, and decide the final set.",
         "selections": selections,
     }
 
@@ -236,15 +238,17 @@ def write_exports(selection: Dict[str, Any], output_dir: Path, copy_to: Path | N
         "face_keep_count": selection.get("face_keep_count", 0),
         "requires_face_final_review": selection.get("requires_face_final_review", False),
         "face_final_review_status": selection.get("face_final_review_status"),
+        "requires_model_scene_review": selection.get("requires_model_scene_review", True),
+        "review_status": selection.get("review_status"),
     }
     (output_dir / "selection_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     return summary
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Select X photos from manifest.json and create practical output folders.")
+    parser = argparse.ArgumentParser(description="Build a script triage candidate pool from manifest.json.")
     parser.add_argument("manifest", help="Path to manifest.json.")
-    parser.add_argument("--keep-count", type=int, required=True, help="Number of 精选 photos to select.")
+    parser.add_argument("--keep-count", type=int, required=True, help="Number of candidate 精选 photos to place in the model-review pool.")
     parser.add_argument("--brief", default="", help="User instruction or aesthetic brief for agent review notes.")
     parser.add_argument(
         "--cull-style",
@@ -252,8 +256,8 @@ def parse_args() -> argparse.Namespace:
         default="balanced",
         help="balanced rejects obvious technical failures while keeping people duplicates in 待定.",
     )
-    parser.add_argument("--output", default=None, help="Output folder. Defaults to manifest parent/final_selection.")
-    parser.add_argument("--copy-to", default=None, help="Create 精选/待定/废片 copy folders here.")
+    parser.add_argument("--output", default=None, help="Output folder. Defaults to manifest parent/candidate_selection.")
+    parser.add_argument("--copy-to", default=None, help="Create candidate 精选/待定/废片 copy folders here.")
     parser.add_argument("--file-mode", choices=["copy", "hardlink"], default="copy", help="Use hardlink to avoid extra disk usage on the same volume.")
     return parser.parse_args()
 
@@ -264,14 +268,35 @@ def main() -> int:
         raise SystemExit("--keep-count must be positive.")
     manifest_path = Path(args.manifest).expanduser().resolve()
     manifest = load_manifest(manifest_path)
-    output_dir = Path(args.output).expanduser().resolve() if args.output else manifest_path.parent / "final_selection"
-    copy_to = Path(args.copy_to).expanduser().resolve() if args.copy_to else output_dir / "folders"
+    output_dir = Path(args.output).expanduser().resolve() if args.output else manifest_path.parent / "candidate_selection"
+    process_dir = output_dir / PROCESS_DIR
+    copy_to = Path(args.copy_to).expanduser().resolve() if args.copy_to else output_dir / DRAFT_RESULT_DIR
     selection = build_selection(manifest, args.keep_count, args.brief, args.cull_style)
-    selection_path = output_dir / "selection.json"
     output_dir.mkdir(parents=True, exist_ok=True)
+    process_dir.mkdir(parents=True, exist_ok=True)
+    selection_path = process_dir / "selection.json"
     selection_path.write_text(json.dumps(selection, ensure_ascii=False, indent=2), encoding="utf-8")
-    summary = write_exports(selection, output_dir, copy_to, args.file_mode)
+    summary = write_exports(selection, process_dir, copy_to, args.file_mode)
     summary["selection_json"] = str(selection_path)
+    summary["human_output_dir"] = str(output_dir)
+    summary["result_dir"] = str(copy_to)
+    summary["process_dir"] = str(process_dir)
+    summary["open_here"] = str(
+        write_open_here(
+            output_dir,
+            title="Steven Photo Director 模型审片候选",
+            result_dir=copy_to,
+            process_dir=process_dir,
+            selection_json=selection_path,
+            summary_json=process_dir / "selection_summary.json",
+            counts=summary.get("counts"),
+            status="机器只完成了清洗、风险标记和候选池整理；这不是最终选片。必须让智能体/模型看图做场景识别、场景取舍和最终精选。",
+            next_action=(
+                "先看 `01_模型审片候选/精选`、`01_模型审片候选/待定`、重复/风险对比图和场景分组。"
+                "模型确认每个场景的意义、保留价值和最好瞬间后，再导出 `01_最终结果`。"
+            ),
+        )
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 

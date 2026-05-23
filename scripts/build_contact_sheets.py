@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     manifest_path = Path(args.manifest).expanduser().resolve()
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     output_dir = Path(args.output).expanduser().resolve() if args.output else manifest_path.parent
     written = build_contact_sheets(
         manifest["items"],

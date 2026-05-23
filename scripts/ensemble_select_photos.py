@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Multi-method photo selection with cross-check votes.
+"""Multi-method photo candidate triage with cross-check votes.
 
-This is the "firepower" selector: several lightweight methods score the same
-manifest, then the script selects a consensus set and exposes disagreements.
+This is the "firepower" candidate builder: several lightweight methods score
+the same manifest, then the script organizes a consensus candidate pool and
+exposes disagreements for model/editor visual review.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple
 
-from export_selection import copy_rows, write_list
+from export_selection import DRAFT_RESULT_DIR, PROCESS_DIR, copy_rows, write_list, write_open_here
 from select_photos import face_review_status, is_hard_reject
 
 
@@ -34,7 +35,7 @@ SOFT_FLAGS = {
 
 
 def load_manifest(path: Path) -> Dict[str, Any]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if "items" not in data or not isinstance(data["items"], list):
         raise SystemExit("manifest.json must contain an item list.")
     return data
@@ -132,7 +133,7 @@ def load_group_guidance(
         assignments = Path(assignments_path).expanduser().resolve()
     else:
         assignments = choices.parent / "group_assignments.json"
-    assignment_data = json.loads(assignments.read_text(encoding="utf-8"))
+    assignment_data = json.loads(assignments.read_text(encoding="utf-8-sig"))
     actions: Dict[str, str] = {}
     keep_counts: Dict[str, int] = {}
     with choices.open("r", newline="", encoding="utf-8-sig") as handle:
@@ -154,7 +155,7 @@ def load_group_guidance(
         "path_to_group": assignment_data.get("path_to_group", {}),
         "actions": actions,
         "keep_counts": keep_counts,
-        "has_include": any(action == "include" for action in actions.values()),
+        "has_include": any(action in {"include", "priority"} for action in actions.values()),
     }
 
 
@@ -403,7 +404,9 @@ def build_selection(
         "selection_brief": brief,
         "selection_method": "ensemble",
         **face_status,
-        "selection_notes": "Consensus across technical, duplicate representative, aesthetic proxy, and people-friendly scoring. Review high-disagreement rows before final delivery.",
+        "requires_model_scene_review": True,
+        "review_status": "machine_triage_only_requires_model_scene_review",
+        "selection_notes": "Machine triage only. Ensemble scores only organize candidates and disagreements; the agent/model must visually identify scenes, compare within scenes, and decide the final set.",
         "selections": selections,
     }
     return selection, audit_rows
@@ -446,13 +449,15 @@ def write_exports(selection: Dict[str, Any], audit_rows: Sequence[Dict[str, Any]
         "face_keep_count": selection.get("face_keep_count", 0),
         "requires_face_final_review": selection.get("requires_face_final_review", False),
         "face_final_review_status": selection.get("face_final_review_status"),
+        "requires_model_scene_review": selection.get("requires_model_scene_review", True),
+        "review_status": selection.get("review_status"),
     }
     (output_dir / "selection_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     return summary
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Select X photos using multiple cross-checking methods.")
+    parser = argparse.ArgumentParser(description="Build a candidate pool using multiple cross-checking methods.")
     parser.add_argument("manifest", help="Path to manifest.json.")
     parser.add_argument("--keep-count", type=int, required=True)
     parser.add_argument("--brief", default="")
@@ -473,13 +478,34 @@ def main() -> int:
     manifest = load_manifest(manifest_path)
     group_guidance = load_group_guidance(args.group_choices, args.group_assignments)
     output_dir = Path(args.output).expanduser().resolve() if args.output else manifest_path.parent / "ensemble_selection"
-    copy_to = Path(args.copy_to).expanduser().resolve() if args.copy_to else output_dir / "folders"
+    process_dir = output_dir / PROCESS_DIR
+    copy_to = Path(args.copy_to).expanduser().resolve() if args.copy_to else output_dir / DRAFT_RESULT_DIR
     selection, audit_rows = build_selection(manifest, args.keep_count, args.brief, args.cull_style, group_guidance)
     output_dir.mkdir(parents=True, exist_ok=True)
-    selection_path = output_dir / "selection.json"
+    process_dir.mkdir(parents=True, exist_ok=True)
+    selection_path = process_dir / "selection.json"
     selection_path.write_text(json.dumps(selection, ensure_ascii=False, indent=2), encoding="utf-8")
-    summary = write_exports(selection, audit_rows, output_dir, copy_to, args.file_mode)
+    summary = write_exports(selection, audit_rows, process_dir, copy_to, args.file_mode)
     summary["selection_json"] = str(selection_path)
+    summary["human_output_dir"] = str(output_dir)
+    summary["result_dir"] = str(copy_to)
+    summary["process_dir"] = str(process_dir)
+    summary["open_here"] = str(
+        write_open_here(
+            output_dir,
+            title="Steven Photo Director 模型审片候选",
+            result_dir=copy_to,
+            process_dir=process_dir,
+            selection_json=selection_path,
+            summary_json=process_dir / "selection_summary.json",
+            counts=summary.get("counts"),
+            status="多方法脚本只完成候选池整理、风险标记和分歧暴露；这不是最终选片。必须让智能体/模型看图做场景识别、场景取舍和最终精选。",
+            next_action=(
+                "先看 `01_模型审片候选/精选`、`01_模型审片候选/待定`、method_disagreements.csv、重复/风险对比图和场景分组。"
+                "模型确认每个场景的意义、保留价值和最好瞬间后，再导出 `01_最终结果`。"
+            ),
+        )
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 

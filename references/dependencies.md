@@ -140,7 +140,7 @@ If full installs, the Skill can combine:
 - face and eye risk cues
 - contact sheets
 - aesthetic rubric review
-- final selection lists and sidecars
+- candidate and final selection lists/sidecars after model/editor review
 
 If only core is available, the Skill still does:
 
@@ -148,8 +148,8 @@ If only core is available, the Skill still does:
 - blur/exposure/contrast risk
 - duplicate grouping
 - contact sheets
-- final selection export
-- multi-method ensemble selection using lightweight scores
-- scene/visual grouping for user-guided selection
+- final package export from a model/editor-reviewed selection JSON
+- multi-method ensemble candidate organization using lightweight scores
+- scene/visual grouping for model/user-guided selection
 
-The final aesthetic decision always belongs to the agent/editor using the rubric, not to a numeric model score.
+The final aesthetic and scene decision always belongs to the agent/editor using visual review and the rubric, not to a numeric model score.

@@ -18,7 +18,7 @@ from scan_photos import build_sheet, hamming_hex
 
 
 def load_manifest(path: Path) -> Dict[str, Any]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if "items" not in data or not isinstance(data["items"], list):
         raise SystemExit("manifest.json must contain an item list.")
     return data
@@ -225,9 +225,14 @@ def write_outputs(manifest: Dict[str, Any], groups: List[Dict[str, Any]], output
             {
                 "group_id": group["group_id"],
                 "action": "",
+                "scene_quality": "",
+                "scene_role": "",
+                "evidence": "",
+                "memory_note": "",
                 "keep_count": "",
                 "notes": "",
                 "count": group["count"],
+                "avg_technical_score": group["avg_technical_score"],
                 "first_relative_path": group["first_relative_path"],
                 "last_relative_path": group["last_relative_path"],
                 "risk_flags": ",".join(group["risk_flags"]),
@@ -265,17 +270,35 @@ def write_outputs(manifest: Dict[str, Any], groups: List[Dict[str, Any]], output
     write_csv(
         output_dir / "group_choices.csv",
         choice_rows,
-        ["group_id", "action", "keep_count", "notes", "count", "first_relative_path", "last_relative_path", "risk_flags"],
+        [
+            "group_id",
+            "action",
+            "scene_quality",
+            "scene_role",
+            "evidence",
+            "memory_note",
+            "keep_count",
+            "notes",
+            "count",
+            "avg_technical_score",
+            "first_relative_path",
+            "last_relative_path",
+            "risk_flags",
+        ],
     )
     lines = [
         "# Photo Scene Groups",
         "",
-        "Edit `group_choices.csv` to guide final selection:",
+        "These script groups are provisional. The agent/model must inspect the scene folders/contact sheets before editing `group_choices.csv`:",
         "",
-        "- `include`: select only from included/priority groups when any include exists",
-        "- `priority`: keep eligible and boost this group",
-        "- `exclude`: keep out of final selection",
-        "- `keep_count`: optional target count for that group",
+        "- `include`: model/user wants this scene considered",
+        "- `priority`: model/user wants this scene boosted",
+        "- `exclude`: model/user wants this scene kept out",
+        "- `scene_quality`: 0-5, model/user quality judgment for this scene",
+        "- `scene_role`: hero / strong / support / weak / drop",
+        "- `evidence`: why this scene is worth more or less",
+        "- `memory_note`: short temporary memory for later merged review",
+        "- `keep_count`: model/user approximate target count for that scene",
         "",
         f"Total groups: {len(groups)}",
         "",

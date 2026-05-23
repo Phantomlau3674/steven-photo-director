@@ -1,7 +1,7 @@
 interface:
   display_name: "Steven Photo Director"
-  short_description: "Cull large photo folders without touching originals."
+  short_description: "Cull photos with startup choices, scene memory, and model review boards."
   brand_color: "#1F7A8C"
-  default_prompt: "Use $steven-photo-director to inspect this photo folder, ask me whether to group scenes and what culling strength to use, then produce selected/review/reject folders."
+  default_prompt: "Use $steven-photo-director to inspect this photo folder. First ask for dependency profile (core/plus/full), scene grouping, culling strength, review mode (board/super-select), final count, and brief. Select scenes first, record scene memory and allocation, then use score-assisted review boards before exporting human-readable final folders."
 policy:
   allow_implicit_invocation: true

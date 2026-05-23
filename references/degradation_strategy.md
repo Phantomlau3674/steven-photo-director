@@ -46,15 +46,16 @@ For very large folders:
 - Keep contact sheets capped with `--max-contact-groups`.
 - Use duplicate grouping first; it gives the largest time savings.
 - If full visual review is too large, review only duplicate picks and risk sheets first.
-- Export a draft selection and ask for a second pass by category, time range, or rating target.
+- Export `01_模型审片候选` and ask for a model/user second pass by scene, time range, category, or rating target.
 
 ## Aesthetic Fallbacks
 
 If the agent cannot visually inspect images:
 
 - Do not claim final aesthetic judgment.
-- Produce a mechanical cull only.
-- Mark candidates as `REVIEW`, not `KEEP`, except when the user explicitly requests automatic selection.
+- Produce only a mechanical candidate package.
+- If script output contains `KEEP`, explain that it means candidate top picks, not final `01_最终结果/精选`.
+- Do not export `01_最终结果` unless a visual-capable model/editor reviews the scenes or the user explicitly accepts unattended mechanical output.
 
 If visual inspection is available but context is limited:
 
@@ -66,8 +67,9 @@ If visual inspection is available but context is limited:
 
 The agent should still produce:
 
-- `first_pass_report.md`
 - `manifest.csv`
 - `manifest.json`
+- `打开这里_README.md`
+- `01_模型审片候选/`
 - a clear list of what could not be evaluated
 - the next command or user action needed to improve coverage
