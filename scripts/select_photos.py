@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Set, Tuple
 
-from export_selection import DRAFT_RESULT_DIR, PROCESS_DIR, copy_rows, write_list, write_open_here
+from export_selection import DECISION_ORDER, DRAFT_RESULT_DIR, PROCESS_DIR, copy_rows, write_list, write_open_here
 
 
 HARD_REJECT_FLAGS = {"decode_failed", "low_resolution"}
@@ -179,19 +179,17 @@ def build_selection(manifest: Dict[str, Any], keep_count: int, brief: str, cull_
             rating = 1 if not item.get("decode_failed") else 0
             label = "red"
             reason = "Clear mechanical reject under the selected culling style."
-        elif cull_style == "strict" and item.get("duplicate_group_id") and not item.get("script_duplicate_pick"):
-            decision = "REJECT"
-            rating = 1
-            label = "red"
-            reason = "Strict mode: weaker duplicate not selected."
         else:
-            decision = "REVIEW"
-            rating = 3
-            label = "yellow"
+            decision = "UNSELECTED"
+            rating = 2
+            label = "blue"
             if item.get("duplicate_group_id") and not item.get("script_duplicate_pick"):
+                decision = "REVIEW"
+                rating = 3
+                label = "yellow"
                 reason = "Duplicate/sequence alternate. Keep in 待定 for expression, pose, and client taste review."
             else:
-                reason = "Not in the top count, but may be useful after aesthetic review."
+                reason = "Not selected by the machine candidate pass. This is 未入选, not 废片."
         if flags:
             reason += " Flags: " + ", ".join(sorted(flags)) + "."
         selections.append(
@@ -223,9 +221,10 @@ def build_selection(manifest: Dict[str, Any], keep_count: int, brief: str, cull_
 def write_exports(selection: Dict[str, Any], output_dir: Path, copy_to: Path | None, file_mode: str) -> Dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     rows = selection["selections"]
-    by_decision = {decision: [item for item in rows if item["decision"] == decision] for decision in ("KEEP", "REVIEW", "REJECT")}
+    by_decision = {decision: [item for item in rows if item["decision"] == decision] for decision in DECISION_ORDER}
     write_list(output_dir / "selection_keep.txt", by_decision["KEEP"])
     write_list(output_dir / "selection_review.txt", by_decision["REVIEW"])
+    write_list(output_dir / "selection_unselected.txt", by_decision["UNSELECTED"])
     write_list(output_dir / "selection_reject.txt", by_decision["REJECT"])
     copied = copy_rows(rows, copy_to, "zh", file_mode) if copy_to else []
     summary = {

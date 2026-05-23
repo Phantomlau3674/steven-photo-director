@@ -45,7 +45,10 @@ For very large folders:
 
 - Keep contact sheets capped with `--max-contact-groups`.
 - Use duplicate grouping first; it gives the largest time savings.
-- If full visual review is too large, review only duplicate picks and risk sheets first.
+- If full visual review is too large, stay in `editorial_depth=light`: scene overview, per-scene standout candidates, merged boards, and final audit prompt.
+- Move to `editorial_depth=standard` only for serious selection: similar-frame comparison boards, near-miss boards, and reverse audit.
+- Move to `editorial_depth=full` only when the user explicitly asks for careful people/portrait/social-post review, preference seeds, or pairwise tournament.
+- Cap rescue work: standout boards at `max(30, target_count*2)`, near misses at about `target_count*2`, and portrait crops only for KEEP plus near-miss candidates.
 - Export `01_模型审片候选` and ask for a model/user second pass by scene, time range, category, or rating target.
 
 ## Aesthetic Fallbacks
@@ -55,6 +58,7 @@ If the agent cannot visually inspect images:
 - Do not claim final aesthetic judgment.
 - Produce only a mechanical candidate package.
 - If script output contains `KEEP`, explain that it means candidate top picks, not final `01_最终结果/精选`.
+- Put ordinary non-selected images in `UNSELECTED`, not `REJECT`. `REJECT` is only for clearly unusable photos.
 - Do not export `01_最终结果` unless a visual-capable model/editor reviews the scenes or the user explicitly accepts unattended mechanical output.
 
 If visual inspection is available but context is limited:

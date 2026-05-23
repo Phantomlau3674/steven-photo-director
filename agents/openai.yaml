@@ -1,7 +1,7 @@
 interface:
   display_name: "Steven Photo Director"
-  short_description: "Cull photos with startup choices, scene memory, and model review boards."
+  short_description: "Cull photos with startup choices, scene memory, standout rescue, and model review boards."
   brand_color: "#1F7A8C"
-  default_prompt: "Use $steven-photo-director to inspect this photo folder. First ask for dependency profile (core/plus/full), scene grouping, culling strength, review mode (board/super-select), final count, and brief. Select scenes first, record scene memory and allocation, then use score-assisted review boards before exporting human-readable final folders."
+  default_prompt: "Use $steven-photo-director to inspect this photo folder. First ask for dependency profile (core/plus/full), scene grouping, culling strength, final count, brief, review mode (board/super-select), editorial depth (light/standard/full), optional preference seeds, and portrait importance. Select scenes first, record scene memory and allocation, then use standout candidates, score-assisted review boards, similar-frame comparison, and reverse audit before exporting human-readable final folders. Ordinary non-selected images are UNSELECTED, not REJECT."
 policy:
   allow_implicit_invocation: true

@@ -13,12 +13,13 @@ from typing import Any, Dict, Iterable, List
 from xml.sax.saxutils import escape
 
 
-DECISIONS = {"KEEP", "REVIEW", "REJECT"}
-DEFAULT_RATING = {"KEEP": 5, "REVIEW": 3, "REJECT": 1}
-DEFAULT_LABEL = {"KEEP": "green", "REVIEW": "yellow", "REJECT": "red"}
+DECISION_ORDER = ("KEEP", "REVIEW", "UNSELECTED", "REJECT")
+DECISIONS = set(DECISION_ORDER)
+DEFAULT_RATING = {"KEEP": 5, "REVIEW": 3, "UNSELECTED": 2, "REJECT": 1}
+DEFAULT_LABEL = {"KEEP": "green", "REVIEW": "yellow", "UNSELECTED": "blue", "REJECT": "red"}
 FOLDER_NAMES = {
-    "zh": {"KEEP": "精选", "REVIEW": "待定", "REJECT": "废片"},
-    "en": {"KEEP": "KEEP", "REVIEW": "REVIEW", "REJECT": "REJECT"},
+    "zh": {"KEEP": "精选", "REVIEW": "待定", "UNSELECTED": "未入选", "REJECT": "废片"},
+    "en": {"KEEP": "KEEP", "REVIEW": "REVIEW", "UNSELECTED": "UNSELECTED", "REJECT": "REJECT"},
 }
 DRAFT_RESULT_DIR = "01_模型审片候选"
 FINAL_RESULT_DIR = "01_最终结果"
@@ -97,6 +98,7 @@ def write_open_here(
                 "",
                 f"- 精选: `{folders['KEEP']}`",
                 f"- 待定: `{folders['REVIEW']}`",
+                f"- 未入选: `{folders['UNSELECTED']}`",
                 f"- 废片: `{folders['REJECT']}`",
                 "",
             ]
@@ -110,6 +112,7 @@ def write_open_here(
                 "",
                 f"- 精选: {counts.get('KEEP', 0)}",
                 f"- 待定: {counts.get('REVIEW', 0)}",
+                f"- 未入选: {counts.get('UNSELECTED', 0)}",
                 f"- 废片: {counts.get('REJECT', 0)}",
                 "",
             ]
@@ -205,10 +208,10 @@ def copy_rows(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Export KEEP/REVIEW/REJECT photo selections after model/editor review.")
+    parser = argparse.ArgumentParser(description="Export KEEP/REVIEW/UNSELECTED/REJECT photo selections after model/editor review.")
     parser.add_argument("selection_json", help="Path to selection.json.")
     parser.add_argument("--output", default=None, help="Output folder. Defaults to selection_json parent.")
-    parser.add_argument("--copy-to", default=None, help="Optional folder for copied KEEP/REVIEW/REJECT files.")
+    parser.add_argument("--copy-to", default=None, help="Optional folder for copied KEEP/REVIEW/UNSELECTED/REJECT files.")
     parser.add_argument("--folder-style", choices=["zh", "en"], default="zh", help="Folder names for --copy-to.")
     parser.add_argument("--file-mode", choices=["copy", "hardlink"], default="copy", help="Use hardlink to avoid extra disk usage on the same volume.")
     parser.add_argument("--xmp", action="store_true", help="Write XMP sidecars into output/xmp_sidecars or --xmp-dir.")
@@ -224,9 +227,10 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     rows = data["selections"]
-    by_decision = {decision: [item for item in rows if item["decision"] == decision] for decision in DECISIONS}
+    by_decision = {decision: [item for item in rows if item["decision"] == decision] for decision in DECISION_ORDER}
     write_list(output_dir / "selection_keep.txt", by_decision["KEEP"])
     write_list(output_dir / "selection_review.txt", by_decision["REVIEW"])
+    write_list(output_dir / "selection_unselected.txt", by_decision["UNSELECTED"])
     write_list(output_dir / "selection_reject.txt", by_decision["REJECT"])
 
     copied = []

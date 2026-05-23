@@ -21,6 +21,7 @@ Machine candidate package:
 01_模型审片候选/
   精选/
   待定/
+  未入选/
   废片/
 90_过程文件/
 ```
@@ -31,6 +32,7 @@ Final package:
 01_最终结果/
   精选/
   待定/
+  未入选/
   废片/
 90_过程文件/
 ```
@@ -83,17 +85,29 @@ review_boards/
   review_board_index.md
   scene_review_memory.csv
   review_pool.csv
+  00_单张出彩候选/
   01_场景分数图板/
   02_合并精审图板/
   03_超级精选逐张清单.csv   # only in super-select mode
+  04_相似图对比板/          # standard/full
+  05_用户偏好种子扩展/      # full, only when seeds are supplied
+  06_人像局部放大板/        # full
+  07_最终反向审查/          # audit prompt always; boards when selection JSON is supplied
+  08_二选一锦标赛/          # full
 ```
 
 Use these boards after scene selection:
 
 - `scene_review_memory.csv`: the model's temporary memory: scene role, quality, reason, and suggested allocation.
+- `00_单张出彩候选/`: 1-3 possible standout photos per scene. Scene quality does not block a strong single image.
 - `01_场景分数图板/`: score-assisted candidates inside each chosen scene.
 - `02_合并精审图板/`: merged cross-scene balance review.
 - `03_超级精选逐张清单.csv`: one-by-one original review list only when the user chose super-select mode.
+- `04_相似图对比板/`: side-by-side duplicate/same-pose/same-scene comparison boards.
+- `05_用户偏好种子扩展/`: photos similar to user-named liked examples.
+- `06_人像局部放大板/`: face/body crop checks for expression, hands, posture, hair blocking, and background cut lines.
+- `07_最终反向审查/`: final audit questions always; final contact sheet, near-miss board, and unselected standout rescue board when a reviewed selection JSON is supplied.
+- `08_二选一锦标赛/`: pairwise model decision template for final tie-breaks.
 
 Scores decide board order only. The model/editor decides final photos.
 
@@ -147,7 +161,11 @@ Allowed decisions:
 
 - `KEEP`
 - `REVIEW`
+- `UNSELECTED`
 - `REJECT`
+
+`UNSELECTED` means "not in the current final set." It is not a waste-bin label.
+Reserve `REJECT` for clearly unusable images.
 
 ## Candidate Scripts
 
@@ -158,6 +176,7 @@ They write process files under `90_过程文件/`:
 - `selection.json`
 - `selection_keep.txt`
 - `selection_review.txt`
+- `selection_unselected.txt`
 - `selection_reject.txt`
 - `selection_summary.json`
 
@@ -172,6 +191,7 @@ By default they copy/hardlink visible folders under:
 01_模型审片候选/
   精选/
   待定/
+  未入选/
   废片/
 ```
 
@@ -208,6 +228,7 @@ For super-select mode, the expected path is scene choices -> `ensemble_select_ph
 - `打开这里_README.md`
 - `01_最终结果/精选`
 - `01_最终结果/待定`
+- `01_最终结果/未入选`
 - `01_最终结果/废片`
 - `90_过程文件/selection_face_final.json`
 - `90_过程文件/face_final_apply_summary.json`

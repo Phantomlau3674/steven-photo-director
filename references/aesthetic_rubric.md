@@ -2,6 +2,20 @@
 
 Use this rubric after the script-based first pass. The scanner can flag risks, but final selection is an editorial decision.
 
+## Editing Actions, Not Just Scores
+
+Visual judgment should become a sequence of review actions:
+
+- find 1-3 possible standout photos in every scene
+- compare near-duplicates side by side
+- rescue strong single images from weak scenes
+- use final contact sheets to catch semantic repetition
+- inspect near misses before delivery
+- when the user names a liked image, expand from that visual preference seed
+- for portraits, inspect face/body crops before finalizing
+
+Do not ask the model to trust a global score. Ask it to compare, reject its own first pass, and revise.
+
 ## Universal Order Of Judgment
 
 1. Moment: Is there a decisive expression, gesture, action, or relationship?
@@ -108,4 +122,6 @@ Every KEEP should have a role:
 - detail shot
 - client-safe backup
 
-If the role is unclear, mark REVIEW or REJECT.
+If the role is unclear, mark REVIEW or UNSELECTED.
+
+Use `UNSELECTED` when an image is usable but not part of the current final set. Use `REJECT` only for clearly unusable images.

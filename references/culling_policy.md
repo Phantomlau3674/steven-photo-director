@@ -22,6 +22,7 @@ Final decisions must be one of:
 
 - `KEEP`
 - `REVIEW`
+- `UNSELECTED`
 - `REJECT`
 
 ## Common Risk Flags
@@ -53,13 +54,29 @@ Scene grouping scripts may cluster similar photos and make contact sheets, but t
 
 Use model/user-reviewed `group_choices.csv` as guidance. Do not treat script group IDs, representative images, or group scores as final scene choices.
 
+## Unselected Policy
+
+Use `UNSELECTED` for photos that are simply not in the current final set.
+This is not a negative aesthetic judgment and not a waste-bin label.
+
+Use `UNSELECTED` for:
+
+- good photos that lose a final-count tradeoff
+- scenes the model/user deprioritized but that are still usable
+- ordinary alternates after the best frame was chosen
+- standout candidates that need a rescue check but do not make the final set
+- any photo that has not received model/editor visual judgment
+
 ## Reject Policy
+
+`REJECT` is reserved for clearly unusable photos. Do not use it to mean "not
+chosen," "not top 30," or "script score is low."
 
 Reject when the image has no clear role and one or more serious issues:
 
-- duplicate with weaker moment, only in strict mode or after visual comparison
+- duplicate with weaker moment, only in strict mode and after visual comparison
 - missed focus with no emotional or documentary value
-- blink or bad expression in a portrait
+- blink or bad expression in a portrait, only after model/editor face review
 - composition blocks the subject
 - accidental frame, black frame, or test shot
 - exposure failure that cannot be repaired

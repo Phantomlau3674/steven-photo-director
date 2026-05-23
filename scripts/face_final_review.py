@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Set
 
 from export_selection import (
+    DECISION_ORDER,
     HUMAN_RESULT_DIR,
     PROCESS_DIR,
     copy_rows,
@@ -450,9 +451,10 @@ def apply_review_choices(args: argparse.Namespace) -> int:
     final_selection.write_text(json.dumps(selection, ensure_ascii=False, indent=2), encoding="utf-8")
 
     rows = selection.get("selections", [])
-    by_decision = {decision: [item for item in rows if item.get("decision") == decision] for decision in ("KEEP", "REVIEW", "REJECT")}
+    by_decision = {decision: [item for item in rows if item.get("decision") == decision] for decision in DECISION_ORDER}
     write_list(process_dir / "selection_keep.txt", by_decision["KEEP"])
     write_list(process_dir / "selection_review.txt", by_decision["REVIEW"])
+    write_list(process_dir / "selection_unselected.txt", by_decision["UNSELECTED"])
     write_list(process_dir / "selection_reject.txt", by_decision["REJECT"])
     result_dir = output_dir / HUMAN_RESULT_DIR
     copied = copy_rows(rows, result_dir, "zh", args.file_mode)

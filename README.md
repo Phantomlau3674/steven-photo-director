@@ -1,16 +1,52 @@
 # Steven Photo Director
 
-Reusable agent skill for non-destructive photo culling, scene grouping, duplicate review, and face-final selection.
+Reusable agent skill for non-destructive photo culling, scene grouping, duplicate comparison, standout rescue, portrait review, and human-readable delivery folders.
 
 ## What It Does
 
-- Inspects large local photo folders before installing dependencies.
-- Asks the user for dependency profile, grouping mode, culling strength, final count, and selection brief.
-- Runs script-based first pass for decode errors, blur, exposure, low resolution, and near duplicates.
-- Supports scene grouping so users can choose whole scenes before selecting final photos.
-- Produces practical folders: `精选/`, `待定/`, `废片/`.
-- Adds a face final review gate for people/portrait/social-post selections.
+- Inspects a photo folder before installing dependencies.
+- Asks for dependency profile, scene grouping, culling strength, final count, brief, review mode, editorial depth, preference seeds, and portrait importance.
+- Uses scripts only for first-pass cleanup, grouping, risk flags, contact sheets, and review-board generation.
+- Requires the model/editor to decide scenes, story value, portraits, expressions, and final KEEP choices.
 - Keeps originals untouched by default.
+
+## Editorial Depth
+
+- `light`: fast default. Scene overview, 1-3 standout candidates per scene, merged review boards, and final reverse-audit prompt.
+- `standard`: serious selection. Adds similar-frame comparison boards, near-miss review, and final reverse audit.
+- `full`: people/social/post-worthy work. Adds portrait crop boards, pairwise tournament, and user preference-seed expansion.
+
+## Output
+
+Every run should point the user to:
+
+```text
+打开这里_README.md
+```
+
+Draft candidate package:
+
+```text
+01_模型审片候选/
+  精选/
+  待定/
+  未入选/
+  废片/
+90_过程文件/
+```
+
+Final package after model/editor review:
+
+```text
+01_最终结果/
+  精选/
+  待定/
+  未入选/
+  废片/
+90_过程文件/
+```
+
+`未入选` means usable but not selected. `废片/REJECT` is only for clearly unusable photos.
 
 ## Install
 
@@ -25,26 +61,20 @@ Then ask the agent to use `$steven-photo-director` on a photo folder.
 
 ## Dependency Profiles
 
-The skill intentionally starts light and asks before installing heavier packages:
-
-- `core`: Pillow + numpy.
-- `plus`: HEIC/RAW/OpenCV/imagehash/scikit-image support.
-- `full`: plus + MediaPipe + PyIQA for face-landmark and learned-quality experiments.
-
-Run dependency preparation from the skill folder:
+Show the user the profiles before installing:
 
 ```powershell
-python scripts\prepare_env.py --profile core
-python scripts\prepare_env.py --profile plus
-python scripts\prepare_env.py --profile full
+python scripts\prepare_env.py --explain
 ```
+
+- `core`: Pillow + numpy, light.
+- `plus`: HEIC/RAW/OpenCV/imagehash/scikit-image, medium.
+- `full`: plus + MediaPipe + PyIQA, heavy.
+
+Do not choose a heavy profile silently.
 
 ## Safety
 
-The workflow is local and non-destructive. It does not upload photos, train on photos, delete originals, or rewrite metadata unless a user explicitly asks for that.
+The workflow is local and non-destructive. It does not upload photos, train on photos, delete originals, or rewrite metadata unless the user explicitly asks.
 
 For public demos, use owned, consented, licensed, or synthetic photos. Avoid private albums, minors, IDs, screens, addresses, and location-sensitive EXIF/GPS.
-
-## License
-
-No open-source license has been selected yet. Public visibility does not grant redistribution or commercial-use rights by itself.

@@ -17,7 +17,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Sequence, Set, Tuple
 
-from export_selection import DRAFT_RESULT_DIR, PROCESS_DIR, copy_rows, write_list, write_open_here
+from export_selection import DECISION_ORDER, DRAFT_RESULT_DIR, PROCESS_DIR, copy_rows, write_list, write_open_here
 from select_photos import face_review_status, is_hard_reject
 
 
@@ -336,10 +336,10 @@ def build_selection(
             label = "green"
             reason = f"Consensus pick: {vote['votes']} method votes."
         elif not is_group_allowed(item, group_guidance):
-            decision = "REJECT"
-            rating = 1
-            label = "red"
-            reason = "Rejected by user scene/group choice."
+            decision = "UNSELECTED"
+            rating = 2
+            label = "blue"
+            reason = "Not selected by model/user scene choice. This is 未入选, not 废片."
         elif is_hard_reject(item, cull_style):
             decision = "REJECT"
             rating = 1 if not item.get("decode_failed") else 0
@@ -350,11 +350,20 @@ def build_selection(
             rating = 3
             label = "yellow"
             if vote["votes"] > 0:
+                decision = "REVIEW"
+                rating = 3
+                label = "yellow"
                 reason = f"Method disagreement/near miss: {vote['votes']} method votes."
             elif item.get("duplicate_group_id"):
+                decision = "REVIEW"
+                rating = 3
+                label = "yellow"
                 reason = "Duplicate/sequence alternate kept for expression, pose, and taste review."
             else:
-                reason = "Not selected by consensus, keep for optional aesthetic review."
+                decision = "UNSELECTED"
+                rating = 2
+                label = "blue"
+                reason = "Not selected by consensus candidate pass. This is 未入选, not 废片."
         if flags:
             reason += " Flags: " + ", ".join(sorted(flags)) + "."
         selections.append(
@@ -426,9 +435,10 @@ def write_csv(path: Path, rows: Sequence[Dict[str, Any]]) -> None:
 def write_exports(selection: Dict[str, Any], audit_rows: Sequence[Dict[str, Any]], output_dir: Path, copy_to: Path | None, file_mode: str) -> Dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     rows = selection["selections"]
-    by_decision = {decision: [item for item in rows if item["decision"] == decision] for decision in ("KEEP", "REVIEW", "REJECT")}
+    by_decision = {decision: [item for item in rows if item["decision"] == decision] for decision in DECISION_ORDER}
     write_list(output_dir / "selection_keep.txt", by_decision["KEEP"])
     write_list(output_dir / "selection_review.txt", by_decision["REVIEW"])
+    write_list(output_dir / "selection_unselected.txt", by_decision["UNSELECTED"])
     write_list(output_dir / "selection_reject.txt", by_decision["REJECT"])
     write_csv(output_dir / "method_votes.csv", audit_rows)
     disagreement_rows = [

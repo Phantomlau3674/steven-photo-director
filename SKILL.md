@@ -19,7 +19,7 @@ Default to non-destructive work: never delete, move, overwrite, or rewrite origi
 - The required visual order is: scene overview -> each scene/contact sheet -> choose scenes and per-scene counts -> merge chosen scenes into a review pool -> final cross-scene review.
 - People photos require model/editor review before final delivery. Do not finalize faces, expressions, posture, or "好不好看" from program score alone.
 - Face/expression review is part of the single final result workflow, not a separate final output.
-- Do not silently choose dependency profile, scene grouping, culling strength, final count, or brief unless the user explicitly asks for unattended auto mode.
+- Do not silently choose dependency profile, scene grouping, culling strength, final count, review mode, editorial depth, preference seeds, or brief unless the user explicitly asks for unattended auto mode.
 
 ## Output Shape
 
@@ -35,6 +35,7 @@ After script triage, output only a candidate package:
 01_模型审片候选/
   精选/
   待定/
+  未入选/
   废片/
 90_过程文件/
 ```
@@ -45,6 +46,7 @@ After model/editor visual review, output the final package:
 01_最终结果/
   精选/
   待定/
+  未入选/
   废片/
 90_过程文件/
 ```
@@ -53,7 +55,7 @@ Keep JSON, CSV, manifests, votes, reports, contact sheets, and audit files insid
 
 ## Required User Gate
 
-After inspecting the folder and before running scan/selection, ask all missing choices together. Do not default to `core`, `balanced`, no grouping, or board mode silently.
+After inspecting the folder and before running scan/selection, ask all missing choices together. Do not default to `core`, `balanced`, no grouping, board mode, or light/standard/full silently.
 
 ```text
 I found <N> photos, formats <...>, about <size>.
@@ -67,6 +69,12 @@ Choose before I run:
 6. Review mode: board / super-select.
    - board: scene boards + score-assisted merged boards; token-efficient default.
    - super-select: after scene choices and boards, open a short one-by-one list for very fine final picking.
+7. Editorial depth: light / standard / full.
+   - light: scan, scene overview, 1-3 standout photos per scene, merged boards, final contact sheet/rescue prompt.
+   - standard: light + similar-frame comparison boards, near-miss board, final reverse audit.
+   - full: standard + portrait crop boards, pairwise tournament, and preference-seed expansion.
+8. Preference seeds, if any: filenames the user already likes, such as IMG_20231004_190645.jpg.
+9. Portrait/people importance: normal / important / critical.
 ```
 
 Explain profiles briefly:
@@ -90,6 +98,7 @@ grouping=yes
 cull-style=balanced
 selection_method=ensemble
 review_mode=board
+editorial_depth=light
 file-mode=hardlink
 ```
 
@@ -101,6 +110,12 @@ Inspect first:
 
 ```bash
 python scripts/inspect_photo_project.py "/path/to/photos" --recursive
+```
+
+Before installing, show the user the dependency levels and complexity:
+
+```bash
+python scripts/prepare_env.py --explain
 ```
 
 Ask before installing. Then run the chosen profile:
@@ -190,23 +205,35 @@ This is not final. `精选` here means merged review candidates after scene sele
 After scene choices exist, combine the model's scene memory with script scores:
 
 ```bash
-python scripts/build_review_boards.py "/path/to/photo_cull_output/manifest.json" --group-choices "/path/to/photo_cull_output/90_过程文件/groups/group_choices.csv" --group-assignments "/path/to/photo_cull_output/90_过程文件/groups/group_assignments.json" --method-votes "/path/to/photo_cull_output/selection_work/90_过程文件/method_votes.csv" --target-count 20 --mode board --output "/path/to/photo_cull_output/selection_work/90_过程文件/review_boards"
+python scripts/build_review_boards.py "/path/to/photo_cull_output/manifest.json" --group-choices "/path/to/photo_cull_output/90_过程文件/groups/group_choices.csv" --group-assignments "/path/to/photo_cull_output/90_过程文件/groups/group_assignments.json" --method-votes "/path/to/photo_cull_output/selection_work/90_过程文件/method_votes.csv" --target-count 20 --mode board --editorial-depth light --output "/path/to/photo_cull_output/selection_work/90_过程文件/review_boards"
 ```
 
 If the user chose super-select mode at startup:
 
 ```bash
-python scripts/build_review_boards.py "/path/to/photo_cull_output/manifest.json" --group-choices "/path/to/photo_cull_output/90_过程文件/groups/group_choices.csv" --group-assignments "/path/to/photo_cull_output/90_过程文件/groups/group_assignments.json" --method-votes "/path/to/photo_cull_output/selection_work/90_过程文件/method_votes.csv" --target-count 20 --mode super --output "/path/to/photo_cull_output/selection_work/90_过程文件/review_boards"
+python scripts/build_review_boards.py "/path/to/photo_cull_output/manifest.json" --group-choices "/path/to/photo_cull_output/90_过程文件/groups/group_choices.csv" --group-assignments "/path/to/photo_cull_output/90_过程文件/groups/group_assignments.json" --method-votes "/path/to/photo_cull_output/selection_work/90_过程文件/method_votes.csv" --target-count 20 --mode super --editorial-depth full --output "/path/to/photo_cull_output/selection_work/90_过程文件/review_boards"
 ```
 
 Use:
 
 - `scene_review_memory.csv` to remember why good scenes get more picks and weak scenes get fewer.
+- `00_单张出彩候选/` to rescue 1-3 possible standout photos from every scene, even weak scenes.
 - `01_场景分数图板/` to compare scored candidates inside each chosen scene.
 - `02_合并精审图板/` to balance the full set across scenes.
 - `03_超级精选逐张清单.csv` only in super-select mode.
+- `04_相似图对比板/` in standard/full mode to force side-by-side comparison of duplicates, same pose, or same scene.
+- `05_用户偏好种子扩展/` in full mode when the user names liked photos.
+- `06_人像局部放大板/` in full mode for expression, hands, posture, hair blocking, and background cut lines.
+- `07_最终反向审查/` always for the audit questions; with a reviewed selection JSON it also writes final contact sheet, near-miss board, and unselected standout rescue board.
+- `08_二选一锦标赛/` in full mode for forced pairwise decisions.
 
 Scores are evidence for ordering review boards, not final decisions.
+
+Depth rule:
+
+- `light` is the default for speed. It builds scene boards, standout candidates, merged boards, and the final audit prompt.
+- `standard` is for serious selection. It adds similar-frame comparison boards, near-miss surfaces, and final reverse audit.
+- `full` is for people/portrait/social-post work. It adds crop boards, pairwise tournament, and optional preference-seed expansion.
 
 ### 5. Mandatory Model Review
 
@@ -215,8 +242,11 @@ Load `references/aesthetic_rubric.md` before final aesthetic calls.
 The agent/model must visually review:
 
 - `90_过程文件/review_boards/scene_review_memory.csv`
+- `90_过程文件/review_boards/00_单张出彩候选/`
 - `90_过程文件/review_boards/01_场景分数图板/`
 - `90_过程文件/review_boards/02_合并精审图板/`
+- `90_过程文件/review_boards/04_相似图对比板/`, when present
+- `90_过程文件/review_boards/07_最终反向审查/`, when present
 - `90_过程文件/method_disagreements.csv`
 - duplicate contact sheets
 - risk contact sheets
@@ -233,7 +263,9 @@ Review by scene and sequence, not by isolated ranking. For each scene, decide:
 - what the scene is
 - whether it belongs in the final story/set
 - which frame has the best moment, expression, composition, and usefulness
-- whether alternates belong in 待定 or 废片
+- whether alternates belong in 待定, 未入选, or 废片
+- whether any scene-level standout deserves rescue even if its scene is weak
+- whether the final set has semantic repeats or missed heroes
 
 After model/editor review, create or update a reviewed selection JSON:
 
@@ -282,6 +314,7 @@ The final delivery must contain:
 final_delivery/打开这里_README.md
 final_delivery/01_最终结果/精选
 final_delivery/01_最终结果/待定
+final_delivery/01_最终结果/未入选
 final_delivery/01_最终结果/废片
 final_delivery/90_过程文件/
 ```
@@ -292,7 +325,7 @@ Tell the user:
 
 - exact path to `打开这里_README.md`
 - exact path to `01_模型审片候选` or `01_最终结果`
-- counts for 精选 / 待定 / 废片
+- counts for 精选 / 待定 / 未入选 / 废片
 - current status: machine candidate, model-reviewed final, or face-review-applied final
 - whether face tuning was applied, waived, or still required
 
